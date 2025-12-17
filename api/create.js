@@ -6,6 +6,16 @@ function pageIdToNotionUrl(pageId) {
 }
 
 export default async function handler(req, res) {
+  // ✅ CORS (permite chamadas do QConcursos e também testes do seu navegador)
+  res.setHeader("Access-Control-Allow-Origin", "https://www.qconcursos.com");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  // ✅ Responde o preflight (OPTIONS)
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Use POST" });
   }
@@ -19,22 +29,17 @@ export default async function handler(req, res) {
     }
 
     const body = req.body || {};
-
     const assunto = String(body.assunto || "").trim();
     const materia = String(body.materia || "").trim();
     const topico = String(body.numero_topico || "").trim();
     const site = String(body.site || "").trim();
     const livro = String(body.livro || "Olhar ainda").trim();
 
-    if (!assunto) {
-      return res.status(400).json({ error: "Assunto é obrigatório" });
-    }
+    if (!assunto) return res.status(400).json({ error: "Assunto é obrigatório" });
 
     const properties = {
-      // Title
       Assunto: { title: [{ text: { content: assunto } }] },
 
-      // Site como texto "Qconcursos" com link (igual Ctrl+K)
       ...(site
         ? {
             Site: {
@@ -42,37 +47,34 @@ export default async function handler(req, res) {
                 {
                   text: {
                     content: "Qconcursos",
-                    link: { url: site }
-                  }
-                }
-              ]
-            }
+                    link: { url: site },
+                  },
+                },
+              ],
+            },
           }
         : {}),
 
-      // Número do tópico em texto
       ...(topico
         ? { "Tópico q concursos": { rich_text: [{ text: { content: topico } }] } }
         : {}),
 
-      // Matéria em texto
       ...(materia
         ? { Matéria: { rich_text: [{ text: { content: materia } }] } }
         : {}),
 
-      // Livro como select
-      ...(livro ? { Livro: { select: { name: livro } } } : {})
+      ...(livro ? { Livro: { select: { name: livro } } } : {}),
     };
 
     const page = await notion.pages.create({
       parent: { database_id: databaseId },
-      properties
+      properties,
     });
 
     return res.status(200).json({
       ok: true,
       id: page.id,
-      notion_url: pageIdToNotionUrl(page.id)
+      notion_url: pageIdToNotionUrl(page.id),
     });
   } catch (err) {
     return res.status(500).json({ error: err?.message || "Erro ao criar página no Notion" });
